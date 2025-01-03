@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowded Detection</title>
+    <link rel="icon" href="static/G_STAS.png" type="image/png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+    <script>
+        // Function to fetch count data and update the DOM
+        let currentCountChart; // Deklarasi variabel untuk grafik
+        let timeLabels = []; // Array untuk menyimpan label waktu
+        let countData = []; // Array untuk menyimpan data hitung
+    
+        async function fetchCountData() {
+            try {
+                const response = await fetch('/count_data');
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                
+                const data = await response.json();
+    
+                // Update HTML with the latest count data
+                document.getElementById('entry-count').textContent = data.entry_count;
+                document.getElementById('exit-count').textContent = data.exit_count;
+                document.getElementById('current-count').textContent = data.current_count;
+    
+                // Update status based on current count
+                const currentCount = data.current_count;
+                const statusElement = document.getElementById('status');
+                if (currentCount > 150) {
+                    statusElement.textContent = 'Status: Overcrowded';
+                    statusElement.classList.remove('text-green-600');
+                    statusElement.classList.add('text-red-600');
+                } else {
+                    statusElement.textContent = 'Status: Normal';
+                    statusElement.classList.remove('text-red-600');
+                    statusElement.classList.add('text-green-600');
+                }
+    
+                // Update chart with the current count
+                updateChart(currentCount);
+            } catch (error) {
+                console.error('Error fetching count data:', error);
+            }
+        }
+    
+        function updateChart(currentCount) {
+            // Update the chart data
+            if (currentCountChart) {
+                // Tambahkan data baru ke array
+                timeLabels.push(new Date().toLocaleTimeString()); // Menambahkan waktu saat ini
+                countData.push(currentCount); // Menambahkan currentCount ke data
+    
+                // Update chart dengan data baru
+                currentCountChart.data.labels = timeLabels;
+                currentCountChart.data.datasets[0].data = countData;
+                currentCountChart.update();
+            }
+        }
+    
+        // Function to create the chart when the page loads
+        function initializeCurrentCountChart() {
+            const ctx = document.getElementById('currentCountChart').getContext('2d');
+            currentCountChart = new Chart(ctx, {
+                type: 'line', // Grafik garis
+                data: {
+                    labels: [], // Label awal kosong
+                    datasets: [{
+                        label: 'Current Count',
+                        data: [],
+                        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4 // Untuk membuat garis melengkung
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true, // Menjaga rasio aspek
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    
+        // Initialize fetching and set interval
+        window.addEventListener('load', () => {
+            initializeCurrentCountChart();
+            fetchCountData(); // Ambil data pertama kali
+            setInterval(fetchCountData, 2000); // Update data setiap 2 detik
+        });
+    </script>
+    
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-md">
+        <div class="container mx-auto flex justify-between items-center p-4">
+            <div class="flex items-center">
+                <img src="{{ url_for('static', filename='stas.png') }}" alt="Logo" class="h-10 mr-3">
+            </div>
+            <nav>
+                <ul class="flex space-x-4">
+                    <h2 class="text-3xl font-bold text-center">Crowded Detection</h2>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 flex-grow">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white shadow-md rounded-lg p-6">
+                <h3 class="text-xl font-semibold">Entry Count</h3>
+                <p class="text-2xl font-bold text-green-600" id="entry-count">0</p>
+            </div>
+            <div class="bg-white shadow-md rounded-lg p-6">
+                <h3 class="text-xl font-semibold">Exit Count</h3>
+                <p class="text-2xl font-bold text-red-600" id="exit-count">0</p>
+            </div>
+            <div class="bg-white shadow-md rounded-lg p-6">
+                <h3 class="text-xl font-semibold">Visitor Current Count</h3>
+                <p class="text-2xl font-bold text-blue-600" id="current-count">0</p>
+            </div>
+        </div>
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="bg-white shadow-md rounded-lg p-4 mb-4 md:w-1/2">
+                <h3 class="text-xl font-semibold text-center mb-4">Live Video</h3>
+                <img src="{{ url_for('video_feed') }}" alt="Live Video Feed" class="w-full max-w-md mx-auto rounded-lg">
+            </div>
+            <div class="bg-white shadow-md rounded-lg p-4 mb-4 md:w-1/2">
+                <h3 class="text-xl font-semibold text-center mb-4">Visitor Chart</h3>
+                <div class="relative w-full h-[300px]">
+                    <canvas id="currentCountChart" class="w-full h-full"></canvas>
+                </div>
+            </div>            
+        </div>
+        <div class="bg-white shadow-md rounded-lg p-4">
+            <h3 class="text-xl font-semibold text-center mb-4" id="status">Status: Normal</h3>
+        </div>
+    </div>
+    
+</body>
+</html>
