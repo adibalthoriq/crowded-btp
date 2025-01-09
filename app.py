@@ -1,10 +1,16 @@
-from flask import Flask, Response, render_template, jsonify
+from flask import Flask, Response, render_template, jsonify, send_file
 import cv2
 import numpy as np
 from ultralytics import YOLO
 from collections import OrderedDict
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image
+from io import BytesIO
+import matplotlib.pyplot as plt
+from datetime import datetime
 
-app = Flask(__name__)
+
+app = Flask(__name__, static_folder='static')
 
 # YOLO setup
 model = YOLO('head.pt')  # Path to your YOLO model
@@ -90,7 +96,7 @@ counted_on_entry = set()
 counted_on_exit = set()
 
 # Video capture
-videopath = "E:\Kuliah\Telkom\Kuliah\StasRG\Kawah putih\dokumentasi\survei 1\sample2.mp4"
+videopath = "E:\Kuliah\Telkom\Kuliah\StasRG\Kawah putih\dokumentasi\survei 2\VID_20241122_114524.mp4"
 cap = cv2.VideoCapture(videopath)
 
 
@@ -170,17 +176,71 @@ def index():
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+graph_data = {
+    "time_labels": [],
+    "count_data": []
+}
+
 @app.route('/count_data')
 def count_data():
-    dalam_count = entry_count - exit_count
+    global entry_count, exit_count, graph_data
+    current_count = entry_count - exit_count
+
+    # Tambahkan data waktu dan jumlah
+    graph_data["time_labels"].append(datetime.now().strftime("%H:%M:%S"))
+    graph_data["count_data"].append(current_count)
+
     data = {
         "entry_count": entry_count,
         "exit_count": exit_count,
-        "current_count": dalam_count
+        "current_count": current_count
     }
     return jsonify(data)
+
+@app.route('/download_excel', methods=['GET'])
+def download_excel():
+    # Buat workbook Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Crowd Data"
+
+    # Tambahkan data ke worksheet
+    ws.append(["Time", "Current Count", "Entry Count", "Exit Count"])
+    for time, count in zip(graph_data["time_labels"], graph_data["count_data"]):
+        ws.append([time, count, entry_count, exit_count])
+
+    # Buat grafik menggunakan matplotlib
+    plt.figure(figsize=(10, 6))
+    plt.plot(graph_data["time_labels"], graph_data["count_data"], marker='o', linestyle='-', color='blue')
+    plt.title("Visitor Count Over Time")
+    plt.xlabel("Time")
+    plt.ylabel("Count")
+    plt.xticks(rotation=45, fontsize=8)
+    plt.tight_layout()
+
+    # Simpan grafik ke gambar
+    img_buffer = BytesIO()
+    plt.savefig(img_buffer, format='png')
+    plt.close()
+    img_buffer.seek(0)
+
+    # Masukkan gambar grafik ke worksheet
+    img = Image(img_buffer)
+    ws.add_image(img, 'E2')  # Letakkan grafik di sel E2
+
+    # Simpan workbook ke buffer
+    excel_buffer = BytesIO()
+    wb.save(excel_buffer)
+    excel_buffer.seek(0)
+
+    # Kirim file ke pengguna
+    return send_file(
+        excel_buffer,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name="Crowd_Data.xlsx"
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
 
-app = Flask(__name__, static_folder='static')
