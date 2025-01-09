@@ -96,8 +96,8 @@ counted_on_entry = set()
 counted_on_exit = set()
 
 # Video capture
-videopath = "E:\Kuliah\Telkom\Kuliah\StasRG\Kawah putih\dokumentasi\survei 2\VID_20241122_114524.mp4"
-cap = cv2.VideoCapture(videopath)
+# videopath = "E:\Kuliah\Telkom\Kuliah\StasRG\Kawah putih\dokumentasi\survei 2\VID_20241122_114524.mp4"
+cap = cv2.VideoCapture(0)
 
 
 def detect_direction(object_id, cy, prev_cy):
