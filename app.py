@@ -9,13 +9,12 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-
 app = Flask(__name__, static_folder='static')
 
 # YOLO setup
 model = YOLO('head.pt')  # Path to your YOLO model
 entry_line_position = 320
-exit_line_position = 380
+exit_line_position = 160
 entry_count = 0
 exit_count = 0
 resize_width = 640   # Ubah sesuai kebutuhan
@@ -99,7 +98,6 @@ counted_on_exit = set()
 # videopath = "E:\Kuliah\Telkom\Kuliah\StasRG\Kawah putih\dokumentasi\survei 2\VID_20241122_114524.mp4"
 cap = cv2.VideoCapture(0)
 
-
 def detect_direction(object_id, cy, prev_cy):
     global entry_count, exit_count
     if prev_cy is not None:
@@ -159,9 +157,6 @@ def generate_frames():
         cv2.line(frame, (0, entry_line_position), (frame.shape[1], entry_line_position), (0, 100, 0), 2)  # Entry line (green)
         cv2.line(frame, (0, exit_line_position), (frame.shape[1], exit_line_position), (0, 0, 255), 2)    # Exit line (red)
 
-
-        
-        
         _, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
 
@@ -190,12 +185,22 @@ def count_data():
     graph_data["time_labels"].append(datetime.now().strftime("%H:%M:%S"))
     graph_data["count_data"].append(current_count)
 
+
     data = {
         "entry_count": entry_count,
         "exit_count": exit_count,
         "current_count": current_count
     }
     return jsonify(data)
+
+@app.route('/reset_count', methods=['POST'])
+def reset_count():
+    global entry_count, exit_count, current_count
+    entry_count = 0
+    exit_count = 0
+    current_count = 0
+    return jsonify({"message": "Count reset successful"})
+
 
 @app.route('/download_excel', methods=['GET'])
 def download_excel():
