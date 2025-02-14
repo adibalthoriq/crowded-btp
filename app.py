@@ -243,7 +243,7 @@ def download_excel():
         excel_buffer,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
-        download_name="Crowd_Data.xlsx"
+        download_name="Crowd_Data_BTP.xlsx"
     )
 
 if __name__ == "__main__":
