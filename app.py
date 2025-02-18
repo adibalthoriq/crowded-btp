@@ -180,16 +180,20 @@ graph_data = {
 def count_data():
     global entry_count, exit_count, graph_data
     current_count = entry_count - exit_count
-
-# Dapatkan waktu sekarang dalam format HH:MM
     current_time = datetime.now().strftime("%H:%M")
 
-    # Cek apakah menit terakhir dalam list berbeda dengan menit sekarang
     if not graph_data["time_labels"] or graph_data["time_labels"][-1] != current_time:
-        current_count = entry_count - exit_count
         graph_data["time_labels"].append(current_time)
         graph_data["count_data"].append(current_count)
 
+        # Batasi data hanya 100 entri terakhir
+        data_excel = 100
+        if len(graph_data["time_labels"]) > data_excel:
+            graph_data["time_labels"].pop(0)
+            graph_data["count_data"].pop(0)
+
+    # Log data untuk debug
+    print(f"Data count: {len(graph_data['time_labels'])}, Latest time: {graph_data['time_labels'][-1]}")
 
     data = {
         "entry_count": entry_count,
@@ -197,6 +201,7 @@ def count_data():
         "current_count": current_count
     }
     return jsonify(data)
+
 
 @app.route('/reset_count', methods=['POST'])
 def reset_count():
@@ -209,16 +214,13 @@ def reset_count():
 
 @app.route('/download_excel', methods=['GET'])
 def download_excel():
-    # Pastikan ada data untuk diekspor
-    if not graph_data["time_labels"]:
-        return jsonify({"error": "No data available to download"}), 400
+    if not graph_data["time_labels"] or len(graph_data["time_labels"]) != len(graph_data["count_data"]):
+        return jsonify({"error": "No data available to download or data mismatch"}), 400
 
-    # Ambil 100 data terakhir
     max_data_points = 100
     time_labels = graph_data["time_labels"][-max_data_points:]
     count_data = graph_data["count_data"][-max_data_points:]
 
-    # Buat workbook Excel
     wb = Workbook()
     ws = wb.active
     ws.title = "Crowd Data"
@@ -230,38 +232,45 @@ def download_excel():
     for i in range(len(time_labels)):
         ws.append([time_labels[i], count_data[i], entry_count, exit_count])
 
-    # Buat grafik jika ada lebih dari satu data
-    if len(time_labels) > 1:
+    # Jika ada cukup data, buat grafik
+    if len(time_labels) > 2:
         fig, ax = plt.subplots(figsize=(8, 4))
         ax.plot(time_labels, count_data, marker='o', linestyle='-', color='blue')
         ax.set_title("Visitor Count Over Time")
         ax.set_xlabel("Time")
         ax.set_ylabel("Count")
+        
+        # Kurangi jumlah label jika terlalu banyak
+        step = max(1, len(time_labels) // 20)
+        ax.set_xticks(time_labels[::step])
+        
         plt.xticks(rotation=45, fontsize=8)
         plt.tight_layout()
 
-        # Simpan gambar grafik ke buffer
         img_buffer = BytesIO()
-        plt.savefig(img_buffer, format='png', dpi=100)
+        plt.savefig(img_buffer, format='png', dpi=70)
         plt.close(fig)
         img_buffer.seek(0)
 
-        # Masukkan gambar grafik ke worksheet
-        img = Image(img_buffer)
-        ws.add_image(img, 'E2')  # Letakkan grafik di sel E2
+        # Masukkan gambar grafik ke Excel
+        try:
+            img = Image(img_buffer)
+            ws.add_image(img, 'E2')
+        except Exception as e:
+            print(f"Error inserting image: {e}")
 
     # Simpan workbook ke buffer
     excel_buffer = BytesIO()
     wb.save(excel_buffer)
     excel_buffer.seek(0)
 
-    # Kirim file ke pengguna
     return send_file(
         excel_buffer,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
         download_name=f"Crowd_Data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     )
+
 
 
 if __name__ == "__main__":
