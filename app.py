@@ -15,8 +15,8 @@ app = Flask(__name__, static_folder='static')
 model = YOLO('head.pt')  # Path to your YOLO model
 entry_line_position = 320
 exit_line_position = 160
-entry_count = 0
-exit_count = 0
+entry_count = 120
+exit_count = 30
 resize_width = 640   # Ubah sesuai kebutuhan
 resize_height = 480  # Ubah sesuai kebutuhan
 
@@ -180,20 +180,11 @@ graph_data = {
 def count_data():
     global entry_count, exit_count, graph_data
     current_count = entry_count - exit_count
-    current_time = datetime.now().strftime("%H:%M")
 
-    if not graph_data["time_labels"] or graph_data["time_labels"][-1] != current_time:
-        graph_data["time_labels"].append(current_time)
-        graph_data["count_data"].append(current_count)
+    # Tambahkan data waktu dan jumlah
+    graph_data["time_labels"].append(datetime.now().strftime("%H:%M:%S"))
+    graph_data["count_data"].append(current_count)
 
-        # Batasi data hanya 100 entri terakhir
-        data_excel = 100
-        if len(graph_data["time_labels"]) > data_excel:
-            graph_data["time_labels"].pop(0)
-            graph_data["count_data"].pop(0)
-
-    # Log data untuk debug
-    print(f"Data count: {len(graph_data['time_labels'])}, Latest time: {graph_data['time_labels'][-1]}")
 
     data = {
         "entry_count": entry_count,
@@ -201,7 +192,6 @@ def count_data():
         "current_count": current_count
     }
     return jsonify(data)
-
 
 @app.route('/reset_count', methods=['POST'])
 def reset_count():
@@ -214,64 +204,47 @@ def reset_count():
 
 @app.route('/download_excel', methods=['GET'])
 def download_excel():
-    if not graph_data["time_labels"] or len(graph_data["time_labels"]) != len(graph_data["count_data"]):
-        return jsonify({"error": "No data available to download or data mismatch"}), 400
-
-    max_data_points = 100
-    time_labels = graph_data["time_labels"][-max_data_points:]
-    count_data = graph_data["count_data"][-max_data_points:]
-
+    # Buat workbook Excel
     wb = Workbook()
     ws = wb.active
     ws.title = "Crowd Data"
 
-    # Tambahkan header
+    # Tambahkan data ke worksheet
     ws.append(["Time", "Current Count", "Entry Count", "Exit Count"])
+    for time, count in zip(graph_data["time_labels"], graph_data["count_data"]):
+        ws.append([time, count, entry_count, exit_count])
 
-    # Tambahkan data historis (hanya 100 data terakhir)
-    for i in range(len(time_labels)):
-        ws.append([time_labels[i], count_data[i], entry_count, exit_count])
+    # Buat grafik menggunakan matplotlib
+    plt.figure(figsize=(10, 6))
+    plt.plot(graph_data["time_labels"], graph_data["count_data"], marker='o', linestyle='-', color='blue')
+    plt.title("Visitor Count Over Time")
+    plt.xlabel("Time")
+    plt.ylabel("Count")
+    plt.xticks(rotation=45, fontsize=8)
+    plt.tight_layout()
 
-    # Jika ada cukup data, buat grafik
-    if len(time_labels) > 2:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.plot(time_labels, count_data, marker='o', linestyle='-', color='blue')
-        ax.set_title("Visitor Count Over Time")
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Count")
-        
-        # Kurangi jumlah label jika terlalu banyak
-        step = max(1, len(time_labels) // 20)
-        ax.set_xticks(time_labels[::step])
-        
-        plt.xticks(rotation=45, fontsize=8)
-        plt.tight_layout()
+    # Simpan grafik ke gambar
+    img_buffer = BytesIO()
+    plt.savefig(img_buffer, format='png')
+    plt.close()
+    img_buffer.seek(0)
 
-        img_buffer = BytesIO()
-        plt.savefig(img_buffer, format='png', dpi=70)
-        plt.close(fig)
-        img_buffer.seek(0)
-
-        # Masukkan gambar grafik ke Excel
-        try:
-            img = Image(img_buffer)
-            ws.add_image(img, 'E2')
-        except Exception as e:
-            print(f"Error inserting image: {e}")
+    # Masukkan gambar grafik ke worksheet
+    img = Image(img_buffer)
+    ws.add_image(img, 'E2')  # Letakkan grafik di sel E2
 
     # Simpan workbook ke buffer
     excel_buffer = BytesIO()
     wb.save(excel_buffer)
     excel_buffer.seek(0)
 
+    # Kirim file ke pengguna
     return send_file(
         excel_buffer,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
-        download_name=f"Crowd_Data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        download_name="Crowd_Data.xlsx"
     )
-
-
 
 if __name__ == "__main__":
     app.run(debug=True)
