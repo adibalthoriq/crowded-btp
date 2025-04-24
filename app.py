@@ -15,8 +15,8 @@ app = Flask(__name__, static_folder='static')
 model = YOLO('head.pt')  # Path to your YOLO model
 entry_line_position = 320
 exit_line_position = 160
-entry_count = 0
-exit_count = 0
+entry_count = 150
+exit_count = 90
 resize_width = 640   # Ubah sesuai kebutuhan
 resize_height = 480  # Ubah sesuai kebutuhan
 
@@ -95,7 +95,7 @@ counted_on_entry = set()
 counted_on_exit = set()
 
 # Video capture
-# videopath = "E:\Kuliah\Telkom\Kuliah\StasRG\Kawah putih\dokumentasi\survei 2\VID_20241122_114524.mp4"
+# videopath = "IMG_20241122_114318957_BURST0005.jpg"
 cap = cv2.VideoCapture(0)
 
 def detect_direction(object_id, cy, prev_cy):
