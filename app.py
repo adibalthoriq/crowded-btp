@@ -15,8 +15,8 @@ app = Flask(__name__, static_folder='static')
 model = YOLO('head.pt')  # Path to your YOLO model
 entry_line_position = 320
 exit_line_position = 160
-entry_count = 120
-exit_count = 30
+entry_count = 0
+exit_count = 0
 resize_width = 640   # Ubah sesuai kebutuhan
 resize_height = 480  # Ubah sesuai kebutuhan
 
